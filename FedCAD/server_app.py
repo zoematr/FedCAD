@@ -14,6 +14,38 @@ from FedCAD.task import Net, load_data, test
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
 
+
+class LoggingFedAvg(FedAvg):
+    """FedAvg strategy with wandb logging for per-round metrics."""
+    
+    def aggregate_train(self, server_round, replies):
+        """Aggregate training results and log metrics."""
+        arrays, metrics = super().aggregate_train(server_round, replies)
+        
+        # Log aggregated training metrics
+        if metrics:
+            wandb.log({
+                f"round_{server_round}/train_loss": metrics.get("train_loss", 0),
+                f"round_{server_round}/num_clients_train": len(replies),
+            }, step=server_round)
+        
+        return arrays, metrics
+    
+    def aggregate_evaluate(self, server_round, replies):
+        """Aggregate evaluation results and log metrics."""
+        metrics = super().aggregate_evaluate(server_round, replies)
+        
+        # Log aggregated evaluation metrics
+        if metrics:
+            wandb.log({
+                f"round_{server_round}/eval_loss": metrics.get("eval_loss", 0),
+                f"round_{server_round}/eval_acc": metrics.get("eval_acc", 0),
+                f"round_{server_round}/num_clients_eval": len(replies),
+            }, step=server_round)
+        
+        return metrics
+
+
 # Create ServerApp
 app = ServerApp()
 
@@ -31,8 +63,8 @@ def main(grid: Grid, context: Context) -> None:
     global_model = Net()
     arrays = ArrayRecord(global_model.state_dict())
 
-    # Initialize FedAvg strategy
-    strategy = FedAvg(fraction_train=fraction_train)
+    # Initialize FedAvg strategy with logging
+    strategy = LoggingFedAvg(fraction_train=fraction_train)
 
     # Initialize wandb for server-side logging
     wandb.init(
