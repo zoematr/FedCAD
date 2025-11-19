@@ -9,6 +9,10 @@ from torch.utils.data import DataLoader
 from FedCAD.task import Net, load_data, test
 
 
+#run with:
+# Fed-CAD % python train_central.py --epochs 10
+
+
 def train_central(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.gpu else "cpu")
