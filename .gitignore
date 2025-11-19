@@ -16,6 +16,7 @@ wandb/
 
 # data
 data/
+.DS_store
 
 # Distribution / packaging
 .Python
