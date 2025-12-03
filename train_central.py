@@ -10,7 +10,7 @@ from FedCAD.task import Net, load_data, test
 
 
 #run with:
-# Fed-CAD % python train_central.py --epochs 10
+#python train_central.py --epochs 10
 
 
 def train_central(args):
@@ -23,7 +23,7 @@ def train_central(args):
     # load all data centrally (partition_id=0, num_partitions=1)
     trainloader, testloader = load_data(0, 1)
 
-    # wandb
+    # set up wandb
     wandb.init(project="FedCAD", name="centralized", config=vars(args), mode=args.wandb_mode)
 
     transform = Compose([ToTensor(), Normalize(mean=[0.5], std=[0.5])])
@@ -68,6 +68,6 @@ if __name__ == "__main__":
     p.add_argument("--epochs", type=int, default=10)
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--gpu", action="store_true", help="use GPU if available")
-    p.add_argument("--wandb-mode", choices=["online", "offline", "disabled"], default="offline")
+    p.add_argument("--wandb-mode", choices=["online", "offline", "disabled"], default="online")
     args = p.parse_args()
     train_central(args)
