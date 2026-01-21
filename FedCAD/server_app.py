@@ -1,7 +1,10 @@
 """FLfraud: A Flower / PyTorch app."""
 
+import time
 import torch
 import wandb
+import numpy as np
+from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 from flwr.app import ArrayRecord, ConfigRecord, Context
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
@@ -22,31 +25,38 @@ def main(grid: Grid, context: Context) -> None:
     lr: float = context.run_config["lr"]
     local_epochs: int = context.run_config["local-epochs"]
 
-    # Initialize wandb
+    # Load test data for evaluation
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    _, testloader = load_data(0, 1)  # Use full dataset for testing
+
+    # Initialize wandb with comprehensive config
+    run_name = f"federated_lr{lr:.3f}_r{num_rounds}_le{local_epochs}"
     wandb.init(
         project="FedCAD",
-        name="federated",
+        name=run_name,
         config={
+            "training_type": "federated",
             "num_rounds": num_rounds,
             "fraction_train": float(f"{fraction_train:.3f}"),
             "local_epochs": local_epochs,
             "lr": float(f"{lr:.4f}"),
-            "training_type": "federated"
+            "total_local_epochs": num_rounds * local_epochs,
+            "test_samples": len(testloader.dataset),
         },
-        tags=["federated"]
+        tags=["federated"],
+        group="comparison"
     )
     wandb.define_metric("round")
     wandb.define_metric("train_loss", step_metric="round")
     wandb.define_metric("test_loss", step_metric="round")
     wandb.define_metric("test_acc", step_metric="round")
 
+    # Track start time
+    start_time = time.time()
+
     # Load global model
     global_model = Net()
     arrays = ArrayRecord(global_model.state_dict())
-
-    # Load test data for evaluation
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    _, testloader = load_data(0, 1)  # Use full dataset for testing
 
     # Initialize FedAvg strategy
     strategy = FedAvg(fraction_train=fraction_train)
@@ -59,25 +69,56 @@ def main(grid: Grid, context: Context) -> None:
         num_rounds=num_rounds,
     )
 
-    # Evaluate and log metrics after each round
-    for round_num in range(1, num_rounds + 1):
-        # Get metrics from this round (if available in result)
-        if hasattr(result, 'metrics_distributed') and result.metrics_distributed:
-            round_metrics = result.metrics_distributed.get(round_num, {})
-            
-            # Aggregate training loss from clients
-            if 'train_loss' in round_metrics:
-                train_loss = round_metrics['train_loss']
-                wandb.log({"round": round_num, "train_loss": train_loss}, commit=False)
-                print(f"Round {round_num}/{num_rounds} | train_loss={train_loss:.3f}")
-
-    # Evaluate final model
+    # Evaluate final model with detailed metrics
     global_model.load_state_dict(result.arrays.to_torch_state_dict())
-    test_loss, test_acc = test(global_model, testloader, device)
-    print(f"\nFinal Results | test_loss={test_loss:.3f} | test_acc={test_acc:.3f}")
+    global_model.to(device)
+    global_model.eval()
     
-    wandb.run.summary["final_test_loss"] = test_loss
-    wandb.run.summary["final_test_acc"] = test_acc
+    all_preds, all_probs, all_labels = [], [], []
+    
+    with torch.no_grad():
+        for images, labels in testloader:
+            images, labels = images.to(device), labels.squeeze().long().to(device)
+            outputs = global_model(images)
+            probs = torch.softmax(outputs, dim=1)
+            preds = torch.argmax(outputs, dim=1)
+            
+            all_preds.extend(preds.cpu().numpy())
+            all_probs.extend(probs.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+    
+    all_preds = np.array(all_preds)
+    all_probs = np.array(all_probs)
+    all_labels = np.array(all_labels)
+    
+    # Calculate final metrics
+    total_time = time.time() - start_time
+    test_loss, test_acc = test(global_model, testloader, device)
+    precision = precision_score(all_labels, all_preds, average='weighted', zero_division=0)
+    recall = recall_score(all_labels, all_preds, average='weighted', zero_division=0)
+    f1 = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
+    
+    try:
+        auc_roc = roc_auc_score(all_labels, all_probs[:, 1])
+    except:
+        auc_roc = 0.0
+    
+    print(f"\nFinal Results | test_loss={test_loss:.3f} | test_acc={test_acc:.3f}")
+    print(f"Metrics: prec={precision:.3f}, rec={recall:.3f}, f1={f1:.3f}, auc={auc_roc:.3f}")
+    print(f"Total training time: {total_time/60:.2f} minutes")
+    
+    # Summary metrics
+    wandb.run.summary.update({
+        "final_test_loss": test_loss,
+        "final_test_acc": test_acc,
+        "final_precision": precision,
+        "final_recall": recall,
+        "final_f1": f1,
+        "final_auc_roc": auc_roc,
+        "total_training_time_min": total_time / 60,
+        "total_rounds": num_rounds,
+        "total_local_epochs": num_rounds * local_epochs,
+    })
 
     # Save final model to disk
     print("\nSaving final model to disk...")
