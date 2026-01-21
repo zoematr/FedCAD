@@ -1,7 +1,6 @@
 import os
 import argparse
 import torch
-import torch.nn.functional as F
 import wandb
 from torchvision.transforms import Compose, ToTensor, Normalize
 from medmnist import BreastMNIST
@@ -18,18 +17,21 @@ def train_central(args):
     device = torch.device("cuda" if torch.cuda.is_available() and args.gpu else "cpu")
     model = Net().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    loss_fn = torch.nn.BCEWithLogitsLoss()
+    loss_fn = torch.nn.CrossEntropyLoss()
 
     # load all data centrally (partition_id=0, num_partitions=1)
     trainloader, testloader = load_data(0, 1)
 
     # W&B: log minimally and control model watching
+    config = vars(args)
+    config["training_type"] = "centralized"
     wandb.init(
         project="FedCAD",
         name="centralized",
-        config=vars(args),
+        config=config,
         mode=args.wandb_mode,
-        settings=wandb.Settings(_disable_stats=True)  # optional: disable system metrics
+        settings=wandb.Settings(_disable_stats=True),  # optional: disable system metrics
+        tags=["centralized"]
     )
     wandb.define_metric("epoch")
     wandb.define_metric("train_loss", step_metric="epoch")
@@ -45,16 +47,15 @@ def train_central(args):
 
         for images, labels in trainloader:
             images = images.to(device)
-            labels_idx = labels.squeeze().long()
-            labels_onehot = F.one_hot(labels_idx, num_classes=2).float().to(device)
+            labels = labels.squeeze().long().to(device)
 
             optimizer.zero_grad()
             outputs = model(images)
-            loss = loss_fn(outputs, labels_onehot)
+            loss = loss_fn(outputs, labels)
             loss.backward()
             optimizer.step()
 
-            batch_size = labels_onehot.size(0)
+            batch_size = labels.size(0)
             running_loss += loss.item() * batch_size
             total_examples += batch_size
 
@@ -64,10 +65,10 @@ def train_central(args):
         if epoch % args.eval_interval == 0:
             test_loss, test_acc = test(model, testloader, device)
             wandb.log({"epoch": epoch, "train_loss": train_loss, "test_loss": test_loss, "test_acc": test_acc}, commit=True)
-            print(f"Epoch {epoch}/{args.epochs} | train_loss={train_loss:.4f} | test_loss={test_loss:.4f} | test_acc={test_acc:.4f}")
+            print(f"Epoch {epoch}/{args.epochs} | train_loss={train_loss:.3f} | test_loss={test_loss:.3f} | test_acc={test_acc:.3f}")
         else:
             wandb.log({"epoch": epoch, "train_loss": train_loss}, commit=True)
-            print(f"Epoch {epoch}/{args.epochs} | train_loss={train_loss:.4f}")
+            print(f"Epoch {epoch}/{args.epochs} | train_loss={train_loss:.3f}")
 
     os.makedirs("models", exist_ok=True)
     torch.save(model.state_dict(), "models/final_model_centralized.pt")

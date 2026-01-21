@@ -19,6 +19,8 @@ dependencies = [
     "torch==2.2.2",
     "torchvision==0.17.2",
     "numpy<2.0.0",
+    "wandb",
+    "medmnist",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -34,9 +36,9 @@ clientapp = "FedCAD.client_app:app"
 
 # Custom config values accessible via `context.run_config`
 [tool.flwr.app.config]
-num-server-rounds = 3
+num-server-rounds = 2
 fraction-train = 0.5
-local-epochs = 1
+local-epochs = 5
 lr = 0.01
 
 # Default federation to use when running the app

@@ -63,7 +63,7 @@ def evaluate(msg: Message, context: Context):
     _, valloader = load_data(partition_id, num_partitions)
 
     # Call the evaluation function
-    eval_loss, eval_acc = test_fn(
+    test_loss, test_acc = test_fn(
         model,
         valloader,
         device,
@@ -71,8 +71,8 @@ def evaluate(msg: Message, context: Context):
 
     # Construct and return reply Message
     metrics = {
-        "eval_loss": eval_loss,
-        "eval_acc": eval_acc,
+        "test_loss": test_loss,
+        "test_acc": test_acc,
         "num-examples": len(valloader.dataset),
     }
     metric_record = MetricRecord(metrics)
