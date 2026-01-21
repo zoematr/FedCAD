@@ -11,6 +11,10 @@ wandb/
 .wandb/
 .wandb_settings
 
+# Results and exports
+results/
+*.csv
+
 # C extensions
 *.so
 
