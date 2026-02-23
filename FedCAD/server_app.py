@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 from flwr.app import ArrayRecord, ConfigRecord, Context
 from flwr.serverapp import Grid, ServerApp
-from flwr.serverapp.strategy import FedAvg
+from flwr.serverapp.strategy import FedAvg, FedProx, DifferentialPrivacyServerSideFixedClipping
 
 from FedCAD.task import Net, load_data, test
 
@@ -25,6 +25,36 @@ def main(grid: Grid, context: Context) -> None:
     lr: float = context.run_config["lr"]
     local_epochs: int = context.run_config["local-epochs"]
 
+    #FedProx parameter
+    proximal_mu: float = float(context.run_config.get("proximal-mu", 0.001))
+    
+    # DP parameters
+    noise_multiplier: float = float(context.run_config.get("noise-multiplier", 0.1))
+    clipping_norm: float = float(context.run_config.get("clipping-norm", 1.0))
+    num_sampled_clients: int = int(context.run_config.get("num-sampled-clients", 5))
+
+    if context.run_config.get("fedprox", False):
+        strategy = FedProx(
+            proximal_mu=proximal_mu,
+            fraction_train=fraction_train,
+        )
+        strategy_name = "fedprox"
+    elif context.run_config.get("fedprox-dp", False):
+        base_strategy = FedProx(
+            proximal_mu=proximal_mu,
+            fraction_train=fraction_train,
+        )
+        strategy = DifferentialPrivacyServerSideFixedClipping(
+        strategy=base_strategy,
+        noise_multiplier=noise_multiplier,
+        clipping_norm=clipping_norm,
+        num_sampled_clients=num_sampled_clients,
+        )
+        strategy_name = "fedprox-dp"
+    else:
+        strategy = FedAvg(fraction_train=fraction_train)
+        strategy_name = "fedavg"
+
     # Load test data for evaluation
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _, testloader = load_data(0, 1)  # Use full dataset for testing
@@ -39,6 +69,7 @@ def main(grid: Grid, context: Context) -> None:
             "num_rounds": num_rounds,
             "fraction_train": float(f"{fraction_train:.3f}"),
             "local_epochs": local_epochs,
+            "strategy": strategy_name,
             "lr": float(f"{lr:.4f}"),
             "total_local_epochs": num_rounds * local_epochs,
             "test_samples": len(testloader.dataset),
@@ -58,10 +89,9 @@ def main(grid: Grid, context: Context) -> None:
     global_model = Net()
     arrays = ArrayRecord(global_model.state_dict())
 
-    # Initialize FedAvg strategy
-    strategy = FedAvg(fraction_train=fraction_train)
+    # Initialize aggregation strategy
 
-    # Start strategy, run FedAvg for `num_rounds`
+
     result = strategy.start(
         grid=grid,
         initial_arrays=arrays,
