@@ -38,10 +38,6 @@ publisher = "zoematr"
 serverapp = "FedCAD.server_app:app"
 clientapp = "FedCAD.client_app:app"
 
-# Strategy selection (set one to true, if none are true FedAvg is used)
-fedprox = false
-fedprox-dp = false
-
 # Custom config values accessible via `context.run_config`
 [tool.flwr.app.config]
 num-server-rounds = 10
@@ -52,6 +48,11 @@ noise-multiplier = 0.1
 clipping-norm = 1.0
 num-sampled-clients = 5
 proximal-mu = 0.001
+
+# Strategy selection (set one to true, if none are true FedAvg is used)
+fedprox = false
+fedprox-dp = true
+use_wandb = true
 
 # Default federation to use when running the app
 [tool.flwr.federations]
