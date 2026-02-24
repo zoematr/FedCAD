@@ -42,16 +42,16 @@ clientapp = "FedCAD.client_app:app"
 [tool.flwr.app.config]
 num-server-rounds = 10
 fraction-train = 0.5
-local-epochs = 1
-lr = 0.001
+local-epochs = 3
+lr = 0.01
 noise-multiplier = 0.1
-clipping-norm = 1.0
+clipping-norm = 0.5
 num-sampled-clients = 5
-proximal-mu = 0.001
+proximal-mu = 0.01
 
 # Strategy selection (set one to true, if none are true FedAvg is used)
 fedprox = false
-fedprox-dp = true
+fedprox-dp = false
 use_wandb = true
 
 # Default federation to use when running the app
