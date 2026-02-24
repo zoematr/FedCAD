@@ -1,13 +1,16 @@
-"""FLfraud: A Flower / PyTorch app."""
-
+"""FedCAD: A Flower / PyTorch app."""
+from datetime import datetime
 import time
 import torch
 import wandb
 import numpy as np
+import os
+import csv
+import pandas as pd
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 from flwr.app import ArrayRecord, ConfigRecord, Context
 from flwr.serverapp import Grid, ServerApp
-from flwr.serverapp.strategy import FedAvg
+from flwr.serverapp.strategy import FedAvg, FedProx, DifferentialPrivacyServerSideFixedClipping
 
 from FedCAD.task import Net, load_data, test
 
@@ -15,15 +18,78 @@ from FedCAD.task import Net, load_data, test
 app = ServerApp()
 
 
+#python train_central.py --epochs 10
+def save_to_csv(data: dict, csv_path: str = "results.csv"):
+    """Save results to CSV file with consistent column order."""
+    columns = [
+        "name", "training_type", "state", "strategy",
+        "lr", "epochs", "num_rounds", "local_epochs",
+        "final_test_acc", "final_test_loss", "final_precision",
+        "final_recall", "final_f1", "final_auc_roc",
+        "total_training_time_min", "created_at"
+    ]
+    
+    # Ensure all columns exist in data
+    for col in columns:
+        if col not in data:
+            data[col] = None
+    
+    new_df = pd.DataFrame([data])[columns]
+    
+    if os.path.exists(csv_path):
+        # Read existing, ensure same columns, append
+        existing_df = pd.read_csv(csv_path)
+        for col in columns:
+            if col not in existing_df.columns:
+                existing_df[col] = None
+        combined_df = pd.concat([existing_df[columns], new_df], ignore_index=True)
+        combined_df.to_csv(csv_path, index=False)
+    else:
+        new_df.to_csv(csv_path, index=False)
+    
+    print(f"Results saved to {csv_path}")
+
+
 @app.main()
 def main(grid: Grid, context: Context) -> None:
     """Main entry point for the ServerApp."""
-
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Read run config
     fraction_train: float = context.run_config["fraction-train"]
     num_rounds: int = context.run_config["num-server-rounds"]
     lr: float = context.run_config["lr"]
     local_epochs: int = context.run_config["local-epochs"]
+
+    #FedProx parameter
+    proximal_mu: float = float(context.run_config.get("proximal-mu", 0.001))
+    
+    # DP parameters
+    noise_multiplier: float = float(context.run_config.get("noise-multiplier", 0.1))
+    clipping_norm: float = float(context.run_config.get("clipping-norm", 1.0))
+    num_sampled_clients: int = int(context.run_config.get("num-sampled-clients", 5))
+    use_wandb: bool = context.run_config.get("use-wandb", True)
+
+    if context.run_config.get("fedprox", False):
+        strategy = FedProx(
+            proximal_mu=proximal_mu,
+            fraction_train=fraction_train,
+        )
+        strategy_name = "fedprox"
+    elif context.run_config.get("fedprox-dp", False):
+        base_strategy = FedProx(
+            proximal_mu=proximal_mu,
+            fraction_train=fraction_train,
+        )
+        strategy = DifferentialPrivacyServerSideFixedClipping(
+        strategy=base_strategy,
+        noise_multiplier=noise_multiplier,
+        clipping_norm=clipping_norm,
+        num_sampled_clients=num_sampled_clients,
+        )
+        strategy_name = "fedprox-dp"
+    else:
+        strategy = FedAvg(fraction_train=fraction_train)
+        strategy_name = "fedavg"
 
     # Load test data for evaluation
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -31,26 +97,35 @@ def main(grid: Grid, context: Context) -> None:
 
     # Initialize wandb with comprehensive config
     run_name = f"federated_lr{lr:.3f}_r{num_rounds}_le{local_epochs}"
-    wandb.init(
-        project="FedCAD",
-        name=run_name,
-        config={
-            "training_type": "federated",
-            "num_rounds": num_rounds,
-            "fraction_train": float(f"{fraction_train:.3f}"),
-            "local_epochs": local_epochs,
-            "lr": float(f"{lr:.4f}"),
-            "total_local_epochs": num_rounds * local_epochs,
-            "test_samples": len(testloader.dataset),
-        },
-        tags=["federated"],
-        group="comparison"
-    )
-    wandb.define_metric("round")
-    wandb.define_metric("train_loss", step_metric="round")
-    wandb.define_metric("test_loss", step_metric="round")
-    wandb.define_metric("test_acc", step_metric="round")
-
+    if use_wandb:
+        is_sweep = os.environ.get("WANDB_SWEEP_ID") is not None
+        wandb.init(
+            project="FedCAD",
+            name=run_name,
+            config={
+                "training_type": "federated",
+                "fraction_train": float(f"{fraction_train:.3f}"),
+                "local_epochs": local_epochs,
+                "strategy": strategy_name,
+                "lr": float(f"{lr:.4f}"),
+                "total_local_epochs": num_rounds * local_epochs,
+                "test_samples": len(testloader.dataset),
+                "noise_multiplier": noise_multiplier,
+                "clipping_norm": clipping_norm,
+                "num_sampled_clients": num_sampled_clients,
+                "num_rounds": num_rounds,
+                "proximal_mu": proximal_mu,
+            },
+            tags=["federated", "random_search"] if is_sweep else ["federated"],
+            group="random_search" if is_sweep else "comparison"
+        )
+        wandb.define_metric("round")
+        wandb.define_metric("train_loss", step_metric="round")
+        wandb.define_metric("test_loss", step_metric="round")
+        wandb.define_metric("test_acc", step_metric="round")
+    else:
+        print("⚠️ WandB logging is disabled. Set 'use_wandb' to True in run config to enable.")
+    
     # Track start time
     start_time = time.time()
 
@@ -58,10 +133,9 @@ def main(grid: Grid, context: Context) -> None:
     global_model = Net()
     arrays = ArrayRecord(global_model.state_dict())
 
-    # Initialize FedAvg strategy
-    strategy = FedAvg(fraction_train=fraction_train)
+    # Initialize aggregation strategy
 
-    # Start strategy, run FedAvg for `num_rounds`
+
     result = strategy.start(
         grid=grid,
         initial_arrays=arrays,
@@ -119,6 +193,26 @@ def main(grid: Grid, context: Context) -> None:
         "total_rounds": num_rounds,
         "total_local_epochs": num_rounds * local_epochs,
     })
+
+    save_to_csv({
+        "name": run_name,
+        "training_type": "federated",
+        "state": "finished",
+        "strategy": strategy_name,
+        "lr": lr,
+        "epochs": None,  # Not applicable for federated
+        "num_rounds": num_rounds,
+        "local_epochs": local_epochs,
+        "final_test_acc": test_acc,
+        "final_test_loss": test_loss,
+        "final_precision": precision,
+        "final_recall": recall,
+        "final_f1": f1,
+        "final_auc_roc": auc_roc,
+        "total_training_time_min": total_time / 60,
+        "created_at": created_at,
+    })
+
 
     # Save final model to disk
     print("\nSaving final model to disk...")

@@ -1,1 +1,1 @@
-"""FLfraud: A Flower / PyTorch app."""
+"""FedCAD: A Flower / PyTorch app."""

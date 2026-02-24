@@ -1,4 +1,4 @@
-"""FLfraud: A Flower / PyTorch app."""
+"""FedCAD: A Flower / PyTorch app."""
 
 import torch
 from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
