@@ -1,6 +1,6 @@
 # 🩺 FedCAD - FEDerated Clinical Anomaly Detection
 
-Welcome to **FedCAD**! This project benchmarks **centralized** vs **federated learning** for breast cancer detection using the BreastMNIST dataset, with a focus on privacy (DP) and real-world clinical relevance.
+Welcome to **FedCAD**! This project benchmarks **centralized** vs **federated learning** for breast cancer detection using the BreastMNIST dataset, with a focus on privacy and real-world clinical relevance.
 
 ---
 
@@ -24,21 +24,6 @@ Welcome to **FedCAD**! This project benchmarks **centralized** vs **federated le
     - **Analyze results:**  
       Use `plots.ipynb` to generate visualizations, summary statistics, and key insights.
     - Results (CSVs, plots) will be saved in the `results/` directory.
-
----
-
-## 📝 Project Overview
-
-- **Goal:**  
-  Compare centralized and federated learning for breast cancer detection, including privacy-preserving (DP) and FedProx settings.
-- **Dataset:**  
-  [BreastMNIST](https://medmnist.com/)
-- **Key Features:**
-  - 📊 Performance & efficiency comparison
-  - 🔒 Differential privacy experiments
-  - ⚖️ FedProx regularization
-  - 🔎 Hyperparameter random search & analysis
-  - 📈 Rich visualizations and reporting
 
 ---
 
