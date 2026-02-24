@@ -27,20 +27,6 @@ Welcome to **FedCAD**! This project benchmarks **centralized** vs **federated le
 
 ---
 
-## 📝 Project Overview
-
-- **Goal:**  
-  Compare centralized and federated learning for breast cancer detection, including privacy-preserving (DP) and FedProx settings.
-- **Dataset:**  
-  [BreastMNIST](https://medmnist.com/)
-- **Key Features:**
-  - 📊 Performance & efficiency comparison
-  - 🔒 Differential privacy experiments
-  - ⚖️ FedProx regularization
-  - 🔎 Hyperparameter random search & analysis
-  - 📈 Rich visualizations and reporting
-
----
 
 ## ⚙️ Modes of Operation
 
