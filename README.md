@@ -1,37 +1,53 @@
-# FedCAD: A Flower / PyTorch app
+# 🩺 FL4ME - Federated Learning for Medical Enclaves
 
-## Install dependencies and project
+Welcome to **FL4ME**! This project benchmarks **centralized** vs **federated learning** for breast cancer detection using the BreastMNIST dataset, with a focus on privacy and real-world clinical relevance.
 
-The dependencies are listed in the `pyproject.toml` and you can install them as follows:
+---
 
-```bash
-pip install -e .
+## 🚀 Quick Start
+
+1. **Clone the repository**
+    ```bash
+    git clone https://github.com/your-username/Fed-CAD.git
+    cd Fed-CAD
+    ```
+
+2. **Install dependencies**
+    - All dependencies are listed in `pyproject.toml`:
+    ```bash
+    pip install -e .
+    ```
+
+3. **Run experiments & analysis**
+    - **Train & evaluate:**  
+      Use `run_experiments.ipynb` to run experiments.
+    - **Analyze results:**  
+      Use `plots.ipynb` to generate visualizations, summary statistics, and key insights.
+    - Results (CSVs, plots) will be saved in the `results/` directory.
+
+---
+
+## ⚙️ Modes of Operation
+
+- **WandB Mode:**  
+  Fetches live experiment data from [Weights & Biases](https://wandb.ai/) (requires authentication & project access).
+- **Offline Mode:**  
+  Uses exported CSV data (e.g., `results.csv`) for fully reproducible analysis.
+
+---
+
+## 📂 Repository Structure
+
 ```
-
-> **Tip:** Your `pyproject.toml` file can define more than just the dependencies of your Flower app. You can also use it to specify hyperparameters for your runs and control which Flower Runtime is used. By default, it uses the Simulation Runtime, but you can switch to the Deployment Runtime when needed.
-> Learn more in the [TOML configuration guide](https://flower.ai/docs/framework/how-to-configure-pyproject-toml.html).
-
-## Run with the Simulation Engine
-
-In the `FedCAD` directory, use `flwr run` to run a local simulation:
-
-```bash
-flwr run .
+Fed-CAD/
+├── FL4ME/                # Source code for the Federated experiments
+├── models/                # Saved model checkpoints
+├── results/               # Exported results and analysis
+├── run_experiments.ipynb  # Notebook to run experiments
+├── plots.ipynb            # Main analysis and visualization notebook
+├── pyproject.toml         # Python dependencies
+├── README.md              # Project documentation
+├── random_search_results.csv  # Hyperparameter search results
+├── run_sweep.py           # Hyperparameter search script
+└── sweep_config.yaml      # Configurations for the Hyperparameter search
 ```
-
-Refer to the [How to Run Simulations](https://flower.ai/docs/framework/how-to-run-simulations.html) guide in the documentation for advice on how to optimize your simulations.
-
-## Run with the Deployment Engine
-
-Follow this [how-to guide](https://flower.ai/docs/framework/how-to-run-flower-with-deployment-engine.html) to run the same app in this example but with Flower's Deployment Engine. After that, you might be interested in setting up [secure TLS-enabled communications](https://flower.ai/docs/framework/how-to-enable-tls-connections.html) and [SuperNode authentication](https://flower.ai/docs/framework/how-to-authenticate-supernodes.html) in your federation.
-
-You can run Flower on Docker too! Check out the [Flower with Docker](https://flower.ai/docs/framework/docker/index.html) documentation.
-
-## Resources
-
-- Flower website: [flower.ai](https://flower.ai/)
-- Check the documentation: [flower.ai/docs](https://flower.ai/docs/)
-- Give Flower a ⭐️ on GitHub: [GitHub](https://github.com/adap/flower)
-- Join the Flower community!
-  - [Flower Slack](https://flower.ai/join-slack/)
-  - [Flower Discuss](https://discuss.flower.ai/)

@@ -1,12 +1,12 @@
-"""FLfraud: A Flower / PyTorch app."""
+"""FL4ME: A Flower / PyTorch app."""
 
 import torch
 from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
 
-from FedCAD.task import Net, load_data
-from FedCAD.task import test as test_fn
-from FedCAD.task import train as train_fn
+from FL4ME.task import Net, load_data
+from FL4ME.task import test as test_fn
+from FL4ME.task import train as train_fn
 
 # Flower ClientApp
 app = ClientApp()
