@@ -168,9 +168,10 @@ def main(grid: Grid, context: Context) -> None:
     # Calculate final metrics
     total_time = time.time() - start_time
     test_loss, test_acc = test(global_model, testloader, device)
-    precision = precision_score(all_labels, all_preds, average='weighted', zero_division=0)
-    recall = recall_score(all_labels, all_preds, average='weighted', zero_division=0)
-    f1 = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
+    # For binary medical diagnosis: use pos_label=0 for malignant class (BreastMNIST: 0=malignant, 1=benign)
+    precision = precision_score(all_labels, all_preds, pos_label=0, zero_division=0)
+    recall = recall_score(all_labels, all_preds, pos_label=0, zero_division=0)
+    f1 = f1_score(all_labels, all_preds, pos_label=0, zero_division=0)
     
     try:
         auc_roc = roc_auc_score(all_labels, all_probs[:, 1])
